@@ -1,0 +1,19 @@
+{
+  "name": "eloquent-parser",
+  "version": "0.1.0",
+  "description": "A simple markdown parser done in Livescript",
+  "main": "Gruntfile.js",
+  "devDependencies": {
+    "grunt": "~0.4.1",
+    "grunt-contrib-watch": "~0.4.4",
+    "prelude-ls": "~1.0.3",
+    "grunt-livescript": "~0.5.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tlegard/eloquent-parser.git"
+  },
+  "author": "Tucker Legard",
+  "license": "BSD",
+  "readmeFilename": "README.md"
+}
