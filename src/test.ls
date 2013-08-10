@@ -5,7 +5,7 @@ file = fs.readFile 'markdown/eloquent.md', 'utf8', (err, data) ->
   return console.log err unless !err
   paragraphs = data.split "\r\n\r\n"
   paragraphs = _.map processParagraph, paragraphs
-   
+  console.log renderHTML {}
   console.log extractFootnotes paragraphs  
   console.log paragraphs
 
@@ -89,6 +89,25 @@ htmlDoc = (title, body) ->
 
 escapeHTML = (text) ->
   replacements = [[/&/g "&amp;"][/"/g "&quot"][/</g "&lt;"][/>/g "&gt;"]]
-
-  _.each ((replace) -> text = text.replace _.head replace, _.tail replace), text
+  _.each ((replace) -> 
+    text := text.replace _.head replace, _.last replace)
+  , replacements
   return text
+ 
+renderHTML = (element) -> 
+  # [[a][b],] -> String
+  stringify = _.fold (memo, attribute) -> 
+    memo += "#{_.head attribute}=\"#{escapeHTML _.last attribute}"
+  , '' 
+  
+  # {a: b} --> String
+  renderAttributes = stringify <<  _.obj-to-pairs
+
+  render = (element) --> 
+    | _.isString => escapeHTML element
+    | !element.content or element.content.length is 0 => 
+      "<#{element.name} #{renderAttributes element.attributes} />"
+    | otherwise => "<#{element.name} #{renderAttributes(element.attributes)}>
+      #{_.each render, element.content} </#{element.name}>"
+
+  render element
