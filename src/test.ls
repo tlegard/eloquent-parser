@@ -1,13 +1,15 @@
 _ = require('prelude-ls')
 fs = require('fs')
+util = require('util')
+
 
 file = fs.readFile 'markdown/eloquent.md', 'utf8', (err, data) ->
   return console.log err unless !err
   paragraphs = data.split "\r\n\r\n"
   paragraphs = _.map processParagraph, paragraphs
-  console.log renderHTML {}
-  console.log extractFootnotes paragraphs  
-  console.log paragraphs
+  footnotes = _.map footnote, extractFootnotes paragraphs 
+  body = (_.map paragraph, paragraphs) ++ footnotes
+  console.log renderHTML (htmlDoc "The Test", body)
 
 #------------------------------------------------------------------------------#
 #  File Parsing 
@@ -29,22 +31,25 @@ splitParagraph = (paragraph) ->
   return [] unless paragraph
 
   # determines the type of the content based on the first recursion 
+  # Char -> String
   typeSwitch = (char) -->
     | char is '*' => 'emphasised'
     | char is '{' => 'footnote'
     | otherwise => 'normal'
 
-  # determined
+  # returns a test for span, so that we get all of the characters of that type
+  # String -> Function 
   same = (type) -->
     | type is 'emphasised' => (char) -> char is not \*
     | type is 'footnote' => (char) -> char is not \}
     | otherwise => (char) -> char is not \* and char is not \{
 
-
   type = typeSwitch _.head paragraph
 
   # we do not want to include the beginning character, (if it's a * or {)
-  paragraph = _.tail paragraph unless type is 'emphasised' 
+  paragraph = _.tail paragraph unless type is 'normal' 
+  
+  # [String, String]
   content = _.span (same type), paragraph
   
   # similarly we want to ignore the terminating character for the the next recursion 
@@ -62,52 +67,98 @@ splitParagraph = (paragraph) ->
 extractFootnotes = (paragraphs) ->
   footnotes = []
 
-  replace = (fragment) -> 
+  grabFootnote = (fragment) -> 
     return fragment unless fragment.type is 'footnote'
 
     footnotes.push fragment 
+    fragment.number = footnotes.length
     {type: 'reference', number: footnotes.length}
 
-  _.each ((paragraph) -> paragraph.content = _.map replace, paragraph.content), paragraphs
+  transform = (p) -> p.content = _.map grabFootnote, p.content
+  _.each transform, paragraphs
 
   return footnotes
 
 #------------------------------------------------------------------------------#
-#  Document Rendering
-#    - Responsible for the creation of HTML elements 
+#  DOM Creation
+#    - Responsible for the creation of JSON HTML elements 
+#    - Of the form $el = {name: String, content: [$el], attributes: [{}]}
 #------------------------------------------------------------------------------#
 
+# base constructor "", [$el], {}-> {}
 tag = (name, content, attributes) ->
   {name: name, attributes: attributes, content: content}
 
-link = (target, text) ->
-  tag "a", [], {href: target}
+# generates <a> objects "", $el -> {}
+link = (target, $text) ->  tag "a", [$text], {href: target}
 
-htmlDoc = (title, body) ->
-  tag "html", [tag "head", [tag "title", [title]],
-               tag "body", [body]]
+# generates <img> objects, "" -> {}
+image = (src) -> tag "img", [], {src: src}
 
+# generates boilerplate <html> "", [$el]
+htmlDoc = (title, body) ->  
+  tag "html", [(tag 'head', [tag 'title', [title]]), (tag 'body', body)]
+
+# generates <sup><a></a></sup> for footnotes int -> {}
+reference = (number) -> tag 'sup', [link "\#footnote#{number}", "#{number}"]
+
+# generators <a name=""></a> for linking 
+footnote = (footnote) ->
+  a = tag "a", ["[#{footnote.number}]"], {name: "footnote#{footnote.number}"}
+  tag "p" [tag "small", [a, footnote.content]]
+
+# more general tagging for <p>'s and <h1>'s
+paragraph = ($el) ->  
+  renderFragment = (fragment) ->
+    renderType = (type) -->
+      | type is 'reference' => reference fragment.number
+      | type is 'emphasised' => tag 'em', [fragment.content]
+      | type is 'normal' => fragment.content
+
+    renderType fragment.type
+  
+  tag $el.type, (_.map renderFragment, $el.content)
+
+#------------------------------------------------------------------------------#
+#  DOM Rendering 
+#    - Responsible for rendering HTML for the JSON elements 
+#------------------------------------------------------------------------------#
+
+# replaces reserved characters from HTML with their escaped equlivant
+# String -> String'
 escapeHTML = (text) ->
+  return unless text
+  
   replacements = [[/&/g "&amp;"][/"/g "&quot"][/</g "&lt;"][/>/g "&gt;"]]
-  _.each ((replace) -> 
-    text := text.replace _.head replace, _.last replace)
-  , replacements
+  
+  apply = (replace) -> text := text.replace (._head replace), (_.last replace)
+  
+  _.each apply, replacements
+  
   return text
  
-renderHTML = (element) -> 
+# converts the JSON $el's into true HTML 
+# {} -> 
+renderHTML = ($el) -> 
   # [[a][b],] -> String
-  stringify = _.fold (memo, attribute) -> 
-    memo += "#{_.head attribute}=\"#{escapeHTML _.last attribute}"
-  , '' 
+  concatAttr = (m, a) ->  m += " #{_.head a}=\"#{escapeHTML _.last a}\""
+
+  # [String] -> String
+  concatEl = _.fold1 (m, $el) -> m += "#{$el}"
+
+  # [[a][b],] -> String 
+  stringify = _.fold concatAttr, ''
   
   # {a: b} --> String
   renderAttributes = stringify <<  _.obj-to-pairs
 
-  render = (element) --> 
-    | _.isString => escapeHTML element
-    | !element.content or element.content.length is 0 => 
-      "<#{element.name} #{renderAttributes element.attributes} />"
-    | otherwise => "<#{element.name} #{renderAttributes(element.attributes)}>
-      #{_.each render, element.content} </#{element.name}>"
+  # {} -> String
+  render = ($el) --> 
+    | _.is-type 'String', $el => "#{escapeHTML $el}"
+    | !$el.content or $el.content.length is 0 => 
+      "<#{$el.name}#{renderAttributes $el.attributes} />"
+    | otherwise => 
+      "<#{$el.name}#{renderAttributes($el.attributes)}>
+       #{concatEl(_.map render, $el.content)}</#{$el.name}>"
 
-  render element
+  render $el
