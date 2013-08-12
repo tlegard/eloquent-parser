@@ -28,7 +28,7 @@ of old moulded their programs out of this raw substance. Over time,
 the amorphous Data has crystallised into data types, and the chaotic
 Control was restricted into control structures and functions.
 
-%% Short Sayings
+%% *Short Sayings*
 
 When a student asked Fu-Tzu about the nature of the cycle of Data and
 Control, Fu-Tzu replied 'Think of a compiler, compiling itself.'
