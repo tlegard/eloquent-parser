@@ -19,6 +19,8 @@ file = fs.readFile 'markdown/eloquent.md', 'utf8', (err, data) ->
 # based on the number of %%%'s there are and converts it to a JSON object.
 # String -> {}
 processBlocks = (block) -> 
+  # essentially an alias to hide away some of the _.span logic
+  #  [a ,b] -> ""
   splitOn = (context) -> splitBlock _.last context
 
   header = _.span (is \%), block
@@ -39,7 +41,8 @@ splitBlock = (paragraph) ->
     | otherwise => 'normal'
 
   # returns a test for span, so that we get all of the characters of that type
-  # I'm pretty sure a closure is needed here, but it probably could be condensed
+  # 
+  # TODO: simplify, is closure needed? 
   # String -> Function 
   same = (type) -->
     | type is 'emphasised' => (char) -> (typeOf char) is not 'emphasised'
@@ -99,7 +102,9 @@ image = (src) -> tag "img", [], {src: src}
 
 # generates boilerplate <html> "", [$el]
 htmlDoc = (title, body) ->  
-  tag "html", [(tag 'head', [(tag 'title', [title]), tag 'link', [], {href: './css/style.css', type: 'text/css', rel: 'stylesheet'}]), (tag 'body', body)]
+  tag "html", [(tag 'head', [(tag 'title', [title]), tag 'link', [], 
+    {href: './css/style.css', type: 'text/css', rel: 'stylesheet'}]),
+    (tag 'body', body)]
 
 # generates <sup><a></a></sup> for footnotes int -> {}
 reference = (number) -> tag 'sup', [link "\#footnote#{number}", "#{number}"]
@@ -162,5 +167,4 @@ renderHTML = ($el) ->
     | otherwise => 
       "<#{$el.name}#{renderAttributes($el.attributes)}>
        #{concatEl(_.map render, $el.content)}</#{$el.name}>"
-
   render $el
